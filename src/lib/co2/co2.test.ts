@@ -26,3 +26,15 @@ describe("CO2 estimate", () => {
     expect(() => estimateCo2({ ...base, zoneId: 99 })).toThrow();
   });
 });
+
+import { estimateCo2 as estimateZone } from "./co2.server";
+import { ZONES_SEED } from "@/types";
+describe("per-zone inputs", () => {
+  it("different zones with their own coordinates produce different predictions", () => {
+    const now = new Date("2026-10-21T06:30:00Z");
+    const values = ZONES_SEED.map((z) =>
+      estimateZone({ zoneId: z.id, latitude: z.latitude, longitude: z.longitude, now, currentSpeed: 22, freeFlowSpeed: 40, weather: "Clear" }).estimated_co2_kg_per_hour,
+    );
+    expect(new Set(values).size).toBeGreaterThan(1);
+  });
+});
