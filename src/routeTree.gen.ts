@@ -10,33 +10,146 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as DashboardCarbonFootprintRouteImport } from './routes/dashboard.carbon-footprint'
+import { Route as DashboardGreenCoverRouteImport } from './routes/dashboard.green-cover'
+import { Route as DashboardLiveRouteImport } from './routes/dashboard.live'
+import { Route as DashboardMapRouteImport } from './routes/dashboard.map'
+import { Route as DashboardPredictRouteImport } from './routes/dashboard.predict'
+import { Route as DashboardTreeImpactRouteImport } from './routes/dashboard.tree-impact'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardCarbonFootprintRoute =
+  DashboardCarbonFootprintRouteImport.update({
+    id: '/carbon-footprint',
+    path: '/carbon-footprint',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardGreenCoverRoute = DashboardGreenCoverRouteImport.update({
+  id: '/green-cover',
+  path: '/green-cover',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardLiveRoute = DashboardLiveRouteImport.update({
+  id: '/live',
+  path: '/live',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardMapRoute = DashboardMapRouteImport.update({
+  id: '/map',
+  path: '/map',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardPredictRoute = DashboardPredictRouteImport.update({
+  id: '/predict',
+  path: '/predict',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardTreeImpactRoute = DashboardTreeImpactRouteImport.update({
+  id: '/tree-impact',
+  path: '/tree-impact',
+  getParentRoute: () => DashboardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/login': typeof LoginRoute
+  '/dashboard/carbon-footprint': typeof DashboardCarbonFootprintRoute
+  '/dashboard/green-cover': typeof DashboardGreenCoverRoute
+  '/dashboard/live': typeof DashboardLiveRoute
+  '/dashboard/map': typeof DashboardMapRoute
+  '/dashboard/predict': typeof DashboardPredictRoute
+  '/dashboard/tree-impact': typeof DashboardTreeImpactRoute
+  '/dashboard/': typeof DashboardIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/dashboard/carbon-footprint': typeof DashboardCarbonFootprintRoute
+  '/dashboard/green-cover': typeof DashboardGreenCoverRoute
+  '/dashboard/live': typeof DashboardLiveRoute
+  '/dashboard/map': typeof DashboardMapRoute
+  '/dashboard/predict': typeof DashboardPredictRoute
+  '/dashboard/tree-impact': typeof DashboardTreeImpactRoute
+  '/dashboard': typeof DashboardIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRouteWithChildren
+  '/login': typeof LoginRoute
+  '/dashboard/carbon-footprint': typeof DashboardCarbonFootprintRoute
+  '/dashboard/green-cover': typeof DashboardGreenCoverRoute
+  '/dashboard/live': typeof DashboardLiveRoute
+  '/dashboard/map': typeof DashboardMapRoute
+  '/dashboard/predict': typeof DashboardPredictRoute
+  '/dashboard/tree-impact': typeof DashboardTreeImpactRoute
+  '/dashboard/': typeof DashboardIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/dashboard/carbon-footprint'
+    | '/dashboard/green-cover'
+    | '/dashboard/live'
+    | '/dashboard/map'
+    | '/dashboard/predict'
+    | '/dashboard/tree-impact'
+    | '/dashboard/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard/carbon-footprint'
+    | '/dashboard/green-cover'
+    | '/dashboard/live'
+    | '/dashboard/map'
+    | '/dashboard/predict'
+    | '/dashboard/tree-impact'
+    | '/dashboard'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/dashboard/carbon-footprint'
+    | '/dashboard/green-cover'
+    | '/dashboard/live'
+    | '/dashboard/map'
+    | '/dashboard/predict'
+    | '/dashboard/tree-impact'
+    | '/dashboard/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +161,100 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/carbon-footprint': {
+      id: '/dashboard/carbon-footprint'
+      path: '/carbon-footprint'
+      fullPath: '/dashboard/carbon-footprint'
+      preLoaderRoute: typeof DashboardCarbonFootprintRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/green-cover': {
+      id: '/dashboard/green-cover'
+      path: '/green-cover'
+      fullPath: '/dashboard/green-cover'
+      preLoaderRoute: typeof DashboardGreenCoverRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/live': {
+      id: '/dashboard/live'
+      path: '/live'
+      fullPath: '/dashboard/live'
+      preLoaderRoute: typeof DashboardLiveRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/map': {
+      id: '/dashboard/map'
+      path: '/map'
+      fullPath: '/dashboard/map'
+      preLoaderRoute: typeof DashboardMapRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/predict': {
+      id: '/dashboard/predict'
+      path: '/predict'
+      fullPath: '/dashboard/predict'
+      preLoaderRoute: typeof DashboardPredictRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/tree-impact': {
+      id: '/dashboard/tree-impact'
+      path: '/tree-impact'
+      fullPath: '/dashboard/tree-impact'
+      preLoaderRoute: typeof DashboardTreeImpactRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
+interface DashboardRouteChildren {
+  DashboardCarbonFootprintRoute: typeof DashboardCarbonFootprintRoute
+  DashboardGreenCoverRoute: typeof DashboardGreenCoverRoute
+  DashboardLiveRoute: typeof DashboardLiveRoute
+  DashboardMapRoute: typeof DashboardMapRoute
+  DashboardPredictRoute: typeof DashboardPredictRoute
+  DashboardTreeImpactRoute: typeof DashboardTreeImpactRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardCarbonFootprintRoute: DashboardCarbonFootprintRoute,
+  DashboardGreenCoverRoute: DashboardGreenCoverRoute,
+  DashboardLiveRoute: DashboardLiveRoute,
+  DashboardMapRoute: DashboardMapRoute,
+  DashboardPredictRoute: DashboardPredictRoute,
+  DashboardTreeImpactRoute: DashboardTreeImpactRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
