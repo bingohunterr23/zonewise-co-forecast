@@ -40,7 +40,7 @@ export const predictLocationCo2Fn = createServerFn({ method: "GET" })
     const now = new Date();
     const owKey = process.env["OPENWEATHER_API_KEY"];
     const ttKey = process.env["TOMTOM_API_KEY"];
-    const { estimateCo2, weatherClass, istParts } = await import("./co2/co2.server");
+    const { estimateCo2, weatherClass, istParts, co2Model } = await import("./co2/co2.server");
     const { getZoneTraffic } = await import("./traffic/live-traffic.server");
 
     const [trafficRes, weatherRes, airRes] = await Promise.allSettled([
@@ -122,7 +122,20 @@ export const predictLocationCo2Fn = createServerFn({ method: "GET" })
       }
     } else if (traffic?.road_closure) errors.push("Traffic: road closed");
 
-    console.info("[UrbanEcoSense:co2]", JSON.stringify({ zone: zone.name, traffic, weather, air, prediction, errors }));
+    console.info("[UrbanEcoSense:co2]", JSON.stringify({
+      zone_id: zone.id,
+      zone_name: zone.name,
+      coordinates: { latitude: zone.latitude, longitude: zone.longitude },
+      model_feature_order: co2Model.traffic.feature_names,
+      model_input_features: prediction
+        ? Object.fromEntries(co2Model.traffic.feature_names.map((n, i) => [n, prediction!.traffic_vector[i]]))
+        : null,
+      live_inputs: { current_speed: traffic?.current_speed ?? null, free_flow_speed: traffic?.free_flow_speed ?? null, weather: weather?.model_class ?? null },
+      predicted_vehicles_per_hour: prediction?.expected_vehicles_per_hour ?? null,
+      prediction_co2_kg_per_hour: prediction?.estimated_co2_kg_per_hour ?? null,
+      air,
+      errors,
+    }));
     return {
       location: { id: zone.id, name: zone.name, region: zone.region, latitude: zone.latitude, longitude: zone.longitude },
       time: istParts(now),

@@ -102,6 +102,6 @@ export function predictFrom(input: Record<string, number | null | undefined>) {
   return { value: Math.round(predictVector(vector) * 100) / 100, matched, missing };
 }
 
-export const hourlyProfile = (hour: number) => model.profiles.hourly[String(hour)] ?? 1;
-export const monthlyProfile = (month: number) => model.profiles.monthly[String(month)] ?? 1;
-export const dowProfile = (dow: number) => model.profiles.day_of_week[String(dow)] ?? 1;
+export const hourlyProfile = (hour: number) => model.profiles.hourly[String(hour)] ?? null;
+export const monthlyProfile = (month: number) => model.profiles.monthly[String(month)] ?? null;
+export const dowProfile = (dow: number) => model.profiles.day_of_week[String(dow)] ?? null;

@@ -145,63 +145,29 @@ async function fetchZoneReading(
   return reading;
 }
 
-/** Public live-data source used when an OpenWeather key is not configured. */
-async function fetchOpenMeteoReading(zone: (typeof ZONES_SEED)[number]): Promise<ZoneReading> {
-  const [weatherResult, airResult] = await Promise.allSettled([
-    fetchJson<{
-      current?: { temperature_2m?: number; relative_humidity_2m?: number };
-    }>(
-      `https://api.open-meteo.com/v1/forecast?latitude=${zone.latitude}&longitude=${zone.longitude}&current=temperature_2m,relative_humidity_2m&timezone=UTC`,
-      `weather[zone ${zone.id} ${zone.name}]`,
-    ),
-    fetchJson<{
-      current?: { nitrogen_dioxide?: number; nitrogen_monoxide?: number };
-    }>(
-      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${zone.latitude}&longitude=${zone.longitude}&current=nitrogen_dioxide,nitrogen_monoxide&timezone=UTC`,
-      `air_quality[zone ${zone.id} ${zone.name}]`,
-    ),
-  ]);
-
-  const weather = weatherResult.status === "fulfilled" ? weatherResult.value : null;
-  const air = airResult.status === "fulfilled" ? airResult.value : null;
-  const weatherError = weatherResult.status === "rejected" ? (weatherResult.reason as Error).message : null;
-  const airError = airResult.status === "rejected" ? (airResult.reason as Error).message : null;
-  if (weatherError) console.error(`[UrbanEcoSense] ${weatherError}`);
-  if (airError) console.error(`[UrbanEcoSense] ${airError}`);
-
-  const hasAny = weather != null || air != null;
+/**
+ * No silent fallback provider. The previous Open-Meteo fallback used a ~0.1°
+ * air-quality grid, so every zone received the *same* NO/NO2 values and the
+ * Random Forest (dominated by NOx) returned the same CO2 for all zones.
+ * Without an OpenWeather key the zone is reported as unavailable instead.
+ */
+function unavailableReading(zone: (typeof ZONES_SEED)[number], reason: string): ZoneReading {
   return {
-    zone_id: zone.id,
-    zone_name: zone.name,
-    region: zone.region,
-    traffic_category: zone.traffic_category,
-    latitude: zone.latitude,
-    longitude: zone.longitude,
-    temperature: weather?.current?.temperature_2m ?? null,
-    humidity: weather?.current?.relative_humidity_2m ?? null,
-    pressure: null,
-    wind_speed: null,
-    cloud_coverage: null,
-    aqi: null,
-    aqi_category: null,
-    co: null,
-    no: air?.current?.nitrogen_monoxide ?? null,
-    no2: air?.current?.nitrogen_dioxide ?? null,
-    o3: null,
-    pm2_5: null,
-    pm10: null,
-    source: hasAny ? "open-meteo" : "unavailable",
-    fetched_at: hasAny ? new Date().toISOString() : null,
-    error: [weatherError, airError].filter(Boolean).join(" | ") || null,
-    weather_error: weatherError,
-    air_error: airError,
+    zone_id: zone.id, zone_name: zone.name, region: zone.region,
+    traffic_category: zone.traffic_category, latitude: zone.latitude, longitude: zone.longitude,
+    temperature: null, humidity: null, pressure: null, wind_speed: null, cloud_coverage: null,
+    aqi: null, aqi_category: null, co: null, no: null, no2: null, o3: null, pm2_5: null, pm10: null,
+    source: "unavailable", fetched_at: null, error: reason, weather_error: reason, air_error: reason,
   };
 }
 
 async function fetchLiveReading(zone: (typeof ZONES_SEED)[number], apiKey: string | null) {
-  return apiKey ? fetchZoneReading(zone, apiKey) : fetchOpenMeteoReading(zone);
+  if (!apiKey) {
+    console.error(`[UrbanEcoSense] zone ${zone.id} ${zone.name}: OPENWEATHER_API_KEY not configured`);
+    return unavailableReading(zone, "OpenWeather API key not configured");
+  }
+  return fetchZoneReading(zone, apiKey);
 }
-
 
 /**
  * Unit bridge between OpenWeather and the training data.
@@ -409,7 +375,19 @@ export const predictZonesFn = createServerFn({ method: "GET" }).handler(async ()
   const key = readApiKey();
   const { predictFrom, buildFeatures, model } = await import("./ml/model.server");
   const readings = await mapLimit([...ZONES_SEED], 4, (z) => fetchLiveReading(z, key));
-  return readings.map((r) => zonePrediction(r, predictFrom, buildFeatures, model.feature_names, model.model_type));
+  const results = readings.map((r) => zonePrediction(r, predictFrom, buildFeatures, model.feature_names, model.model_type));
+  // Debug aid: flag zones whose live inputs are byte-identical (the API returned
+  // the same grid cell), which is the only way two zones can share a prediction.
+  const byInput = new Map<string, number[]>();
+  for (const r of readings) {
+    const key = JSON.stringify(featuresFromReading(r));
+    byInput.set(key, [...(byInput.get(key) ?? []), r.zone_id]);
+  }
+  for (const [features, zones] of byInput) {
+    if (zones.length > 1) console.warn("[UrbanEcoSense:prediction] identical live inputs for zones", zones, features);
+  }
+  console.info("[UrbanEcoSense:prediction:summary]", JSON.stringify(results.map((r) => ({ zone_id: r.zone_id, predicted_co2: r.predicted_co2 }))));
+  return results;
 });
 
 export const predictZoneFn = createServerFn({ method: "GET" })
