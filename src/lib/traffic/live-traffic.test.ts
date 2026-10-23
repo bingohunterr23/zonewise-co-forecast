@@ -21,7 +21,7 @@ describe("shared traffic classification", () => {
 describe("shared live TomTom service", () => {
   it("sends each zone's own coordinates with KMPH units", async () => {
     vi.stubEnv("TOMTOM_API_KEY", "test-key");
-    const f = vi.fn(async () => Response.json({ flowSegmentData: { currentSpeed: 20, freeFlowSpeed: 24 } }));
+    const f = vi.fn(async (_url: string | URL | Request) => Response.json({ flowSegmentData: { currentSpeed: 20, freeFlowSpeed: 24 } }));
     vi.stubGlobal("fetch", f);
     const { getZoneTraffic } = await import("./live-traffic.server");
     await Promise.all([getZoneTraffic({ id: 1, latitude: 12.9177, longitude: 77.623 }), getZoneTraffic({ id: 2, latitude: 12.916, longitude: 77.6101 })]);
@@ -55,7 +55,7 @@ describe("shared live TomTom service", () => {
   });
   it("calls TomTom only once per zone within the cache window", async () => {
     vi.stubEnv("TOMTOM_API_KEY", "k");
-    const f = vi.fn(async () => Response.json({ flowSegmentData: { currentSpeed: 20, freeFlowSpeed: 24 } }));
+    const f = vi.fn(async (_url: string | URL | Request) => Response.json({ flowSegmentData: { currentSpeed: 20, freeFlowSpeed: 24 } }));
     vi.stubGlobal("fetch", f);
     const { getZoneTraffic } = await import("./live-traffic.server");
     const a = await getZoneTraffic(zone(3));
