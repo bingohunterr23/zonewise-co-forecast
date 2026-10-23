@@ -9,7 +9,7 @@
 - [x] Trace current Bengaluru zone readings, model features, and Random Forest predictions; add exact ordered vectors and live emission context to backend logs without changing the UI.
 - [x] Rework only the CO₂ Prediction module: traffic RF (Bengaluru) + emission RF (India), live TomTom traffic + OpenWeather.
 - [x] Configure live weather and traffic keys.
-- [ ] Harden shared provider requests, validation, timeouts, retries, and safe errors.
-- [ ] Preserve timestamped last-success readings through refresh; label stale data and prevent overlapping requests.
-- [ ] Remove unintended CHETNA branding without renaming dataset contracts.
-- [ ] Verify mocked failures and authenticated live flows; deliver clean source ZIP and change report.
+- [x] Harden shared provider requests, validation, timeouts, retries, and safe errors.
+- [x] Preserve timestamped last-success readings through refresh; label stale data and prevent overlapping requests.
+- [x] Remove unintended CHETNA branding without renaming dataset contracts.
+- [x] Verify mocked failures and authenticated live flows; deliver clean source ZIP and change report.
