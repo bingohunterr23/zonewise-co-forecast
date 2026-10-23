@@ -63,11 +63,23 @@ export function finiteNumber(value: unknown): number | null {
 export async function requestWeatherJson<T>(url: string, provider: string): Promise<T> {
   const value = await requestProviderJson<Record<string, unknown>>(url, provider);
   const valid = url.includes('/air_pollution')
-    ? Array.isArray(value.list) && value.list.length > 0 && typeof value.list[0]?.components === 'object' && value.list[0]?.components !== null
+    ? Array.isArray(value.list) && value.list.length > 0 && typeof value.list[0]?.components === 'object' && value.list[0]?.components !== null && Object.values(value.list[0].components).some(item => finiteNumber(item) !== null)
     : typeof value.main === 'object' && value.main !== null && finiteNumber((value.main as Record<string, unknown>).temp) !== null;
   if (!valid) {
     requests.delete(url);
     throw new Error(`${provider}: malformed or empty response.`);
+  }
+  if (url.includes('/air_pollution')) {
+    const entry = (value.list as { main?: Record<string, unknown>; components: Record<string, unknown> }[])[0];
+    if (entry) {
+      entry.components = Object.fromEntries(Object.entries(entry.components).map(([key, item]) => [key, finiteNumber(item)]));
+      if (entry.main) entry.main.aqi = finiteNumber(entry.main.aqi);
+    }
+  } else {
+    for (const key of ['main', 'wind', 'clouds']) {
+      const group = value[key];
+      if (group && typeof group === 'object') value[key] = Object.fromEntries(Object.entries(group).map(([name, item]) => [name, finiteNumber(item)]));
+    }
   }
   return value as T;
 }

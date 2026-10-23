@@ -38,7 +38,7 @@ export function HomePage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2 text-sm text-eco-600">
           <div className={`w-2 h-2 rounded-full ${loading ? 'bg-warm-400 animate-pulse' : error ? 'bg-clay-400' : 'bg-eco-500 animate-pulse-soft'}`} />
-          <span>{loading ? 'Fetching live data… · previous readings are stale' : error ? 'Connection issue · retained readings are stale' : stale ? 'Stale readings' : 'Live data active'}</span>
+          <span>{loading ? 'Fetching live data… · previous readings are stale' : error || live.error ? 'Connection issue · check provider messages' : stale ? 'Stale readings' : 'Live data active'}</span>
         </div>
         <div className="flex items-center gap-3">
           {lastUpdated && (

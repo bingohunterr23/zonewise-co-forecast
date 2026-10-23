@@ -29,7 +29,7 @@ export function PredictionPage() {
   const [result, setResult] = useState<LocationPrediction | null>(null);
   const [predLoading, setPredLoading] = useState(false);
   const [stale, setStale] = useState(false);
-  const busyZones = useRef(new Set<number>());
+  const pendingZones = useRef(new Map<number, Promise<LocationPrediction>>());
   const [predError, setPredError] = useState('');
 
   const loadInfo = useCallback(async () => {
@@ -46,22 +46,26 @@ export function PredictionPage() {
 
   const reqId = useRef(0);
   const predict = useCallback(async (id: number) => {
-    if (busyZones.current.has(id)) return;
-    busyZones.current.add(id);
+
     const my = ++reqId.current; // ignore stale responses after a zone switch
     setPredLoading(true);
     setPredError('');
     setStale(true);
     setResult(prev => (prev?.location.id === id ? prev : null));
     try {
-      const r = await predictLocationCo2Fn({ data: { zoneId: id } });
+      let pending = pendingZones.current.get(id);
+      if (!pending) {
+        pending = predictLocationCo2Fn({ data: { zoneId: id } });
+        pendingZones.current.set(id, pending);
+      }
+      const r = await pending;
       if (my === reqId.current) { setResult(r); setStale(false); }
     } catch (e) {
       if (my !== reqId.current) return;
       setStale(true);
       setPredError((e as Error).message);
     } finally {
-      busyZones.current.delete(id);
+      pendingZones.current.delete(id);
       if (my === reqId.current) setPredLoading(false);
     }
   }, []);
@@ -72,13 +76,6 @@ export function PredictionPage() {
     const t = setInterval(() => { void predict(zoneId); }, LIVE_REFRESH_MS);
     return () => { clearInterval(t); reqId.current++; };
   }, [zoneId, predict]);
-
-  if (loading) return (
-    <div>
-      <PageHeader title="CO₂ Intelligence" subtitle="Estimated CO₂ emissions from live Bengaluru traffic" />
-      <LoadingState message="Loading models..." />
-    </div>
-  );
 
   const p = result?.prediction ?? null;
   const hourNow = result?.time.hour;
@@ -116,7 +113,9 @@ export function PredictionPage() {
         </div>
       </div>
 
-      {error ? <ErrorState message={error} onRetry={loadInfo} /> : (
+      {error && <ErrorState message={error} onRetry={loadInfo} />}
+      {loading && <LoadingState message="Loading models..." />}
+      {(
         <>
           {info && (!info.configured.traffic || !info.configured.openweather) && (
             <div className="mb-6 p-4 rounded-xl bg-clay-50 border border-clay-100 flex items-start gap-3">

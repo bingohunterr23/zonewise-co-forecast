@@ -16,7 +16,7 @@ function load(force: boolean) {
   const promise = getLiveTrafficFn();
   const entry = { at: Date.now(), pending: true, promise };
   shared = entry;
-  promise.finally(() => { entry.pending = false; }).catch(() => {});
+  promise.finally(() => { entry.pending = false; entry.at = Date.now(); }).catch(() => {});
   promise.catch(() => { shared = null; });
   return promise;
 }
