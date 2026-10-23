@@ -11,29 +11,9 @@ import { ZONES_SEED } from "@/types";
 
 const AQI_CATEGORIES = ["Good", "Fair", "Moderate", "Poor", "Very Poor"];
 
-/**
- * Resilient OpenWeather fetch.
- * Free-tier keys are rate limited (HTTP 429) and occasionally return 5xx; when
- * all 8 zones fire 16 requests at once some zones used to fail, which is why a
- * few zones showed "Unavailable" while others worked. Each request now retries
- * with backoff and every zone/endpoint is isolated from the others.
- */
-async function fetchJson<T>(url: string, label: string, attempts = 3): Promise<T> {
-  let lastError = "";
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) return (await res.json()) as T;
-      const detail = (await res.text()).slice(0, 160);
-      lastError = `${label} HTTP ${res.status}: ${detail}`;
-      // 4xx other than 429 will not fix itself — fail fast.
-      if (res.status !== 429 && res.status < 500) break;
-    } catch (err) {
-      lastError = `${label} network error: ${(err as Error).message}`;
-    }
-    await new Promise((r) => setTimeout(r, 400 * (i + 1)));
-  }
-  throw new Error(lastError || `${label} failed`);
+async function fetchJson<T>(url: string, label: string): Promise<T> {
+  const { requestWeatherJson } = await import('./provider-request.server');
+  return requestWeatherJson<T>(url, label);
 }
 
 /** Run tasks with limited concurrency so we never burst the OpenWeather limit. */
@@ -43,7 +23,8 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (cursor < items.length) {
       const index = cursor++;
-      out[index] = await fn(items[index]!);
+      const item = items[index];
+      if (item !== undefined) out[index] = await fn(item);
     }
   });
   await Promise.all(workers);
@@ -184,7 +165,7 @@ export function noxPpb(no: number | null, no2: number | null): number | null {
 
 
 function readApiKey(): string | null {
-  return process.env["OPENWEATHER_API_KEY"] || null;
+  return process.env["OPENWEATHER_API_KEY"]?.trim() || null;
 }
 
 export const getZonesFn = createServerFn({ method: "GET" }).handler(async () => ZONES_SEED);

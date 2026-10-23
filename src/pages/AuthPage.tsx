@@ -51,7 +51,7 @@ export function AuthPage() {
               Environmental Intelligence<br />for Bengaluru
             </h2>
             <p className="text-eco-100/80 text-lg leading-relaxed max-w-md">
-              Real-time air quality monitoring, CHETNA-based CO₂ prediction, and
+              Real-time air quality monitoring, machine-learning-based CO₂ prediction, and
               green cover analysis across 8 strategic urban zones.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4 max-w-md">
@@ -67,7 +67,7 @@ export function AuthPage() {
               ))}
             </div>
           </div>
-          <p className="text-eco-100/50 text-sm">Powered by OpenWeather & CHETNA ML Pipeline</p>
+          <p className="text-eco-100/50 text-sm">Powered by OpenWeather, TomTom & Random Forest</p>
         </div>
       </div>
 

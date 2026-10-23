@@ -3,6 +3,7 @@
  * point serves every module, so switching pages never re-hits TomTom within the
  * cache window. Failures are never replaced with static or invented values.
  */
+import { requestProviderJson, finiteNumber } from "../provider-request.server";
 import { classifyTraffic, type TrafficClassification } from "@/lib/co2/traffic-condition";
 
 export const TRAFFIC_CACHE_MS = 2 * 60 * 1000;
@@ -43,16 +44,17 @@ async function request(zone: { id: number; latitude: number; longitude: number }
     current_speed: null, free_flow_speed: null, current_travel_time: null, free_flow_travel_time: null,
     confidence: null, road_closure: false, road_class: null, classification: null,
   };
-  const key = process.env["TOMTOM_API_KEY"];
+  const key = process.env["TOMTOM_API_KEY"]?.trim();
   if (!key) return { ...base, status: "unavailable", error: "Traffic API key not configured" };
   try {
-    const res = await fetch(
+    const response = await requestProviderJson<{ flowSegmentData?: TomTomFlow }>(
       `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${zone.latitude},${zone.longitude}&unit=KMPH&key=${key}`,
+      'TomTom traffic',
     );
-    if (!res.ok) return { ...base, status: "unavailable", error: `HTTP ${res.status}` };
-    const flow = ((await res.json()) as { flowSegmentData?: TomTomFlow }).flowSegmentData;
-    if (!flow || typeof flow.currentSpeed !== "number" || typeof flow.freeFlowSpeed !== "number") {
-      return { ...base, status: "unavailable", error: "no flow data" };
+    const flow = response.flowSegmentData;
+    if (!flow || finiteNumber(flow.currentSpeed) === null || finiteNumber(flow.freeFlowSpeed) === null ||
+        typeof flow.currentSpeed !== 'number' || typeof flow.freeFlowSpeed !== 'number' || flow.currentSpeed < 0 || flow.freeFlowSpeed <= 0) {
+      return { ...base, status: "unavailable", error: "TomTom traffic: malformed or empty flow response." };
     }
     return {
       ...base,
@@ -68,7 +70,7 @@ async function request(zone: { id: number; latitude: number; longitude: number }
       error: flow.roadClosure ? "road closed" : null,
     };
   } catch (e) {
-    return { ...base, status: "unavailable", error: `network error: ${(e as Error).message}` };
+    return { ...base, status: "unavailable", error: (e as Error).message };
   }
 }
 

@@ -36,6 +36,10 @@ export interface LiveReading {
   pm10: number | null;
   source: string;
   fetched_at: string | null;
+  error?: string | null;
+  weather_error?: string | null;
+  air_error?: string | null;
+  stale?: boolean;
 }
 
 export interface ModelMetrics {
