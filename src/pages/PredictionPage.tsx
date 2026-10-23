@@ -59,7 +59,17 @@ export function PredictionPage() {
         pendingZones.current.set(id, pending);
       }
       const r = await pending;
-      if (my === reqId.current) { setResult(r); setStale(false); }
+      if (my === reqId.current) {
+        setResult(previous => {
+          if (!previous || previous.location.id !== id || r.errors.length === 0) return r;
+          const retained = (!r.traffic && previous.traffic) || (!r.weather && previous.weather) || (!r.air && previous.air);
+          if (!retained) return r;
+          return { ...r, traffic: r.traffic ?? previous.traffic, weather: r.weather ?? previous.weather,
+            air: r.air ?? previous.air, prediction: r.prediction ?? previous.prediction,
+            timestamp: previous.timestamp, time: previous.time };
+        });
+        setStale(r.errors.length > 0);
+      }
     } catch (e) {
       if (my !== reqId.current) return;
       setStale(true);

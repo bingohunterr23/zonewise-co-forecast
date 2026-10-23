@@ -35,7 +35,7 @@ export interface LiveTraffic {
   error: string | null;
 }
 
-type Entry = { at: number; promise: Promise<LiveTraffic> };
+type Entry = { at: number; pending: boolean; promise: Promise<LiveTraffic> };
 const cache = new Map<number, Entry>();
 
 async function request(zone: { id: number; latitude: number; longitude: number }): Promise<LiveTraffic> {
@@ -77,11 +77,15 @@ async function request(zone: { id: number; latitude: number; longitude: number }
 
 export function getZoneTraffic(zone: { id: number; latitude: number; longitude: number }): Promise<LiveTraffic> {
   const hit = cache.get(zone.id);
-  if (hit && Date.now() - hit.at < TRAFFIC_CACHE_MS) return hit.promise;
+  if (hit && (hit.pending || Date.now() - hit.at < TRAFFIC_CACHE_MS)) return hit.promise;
   const promise = request(zone).then((r) => {
     if (r.status !== "ok") cache.delete(zone.id); // don't keep failures
+    else {
+      const entry = cache.get(zone.id);
+      if (entry) { entry.at = Date.now(); entry.pending = false; }
+    }
     return r;
   });
-  cache.set(zone.id, { at: Date.now(), promise });
+  cache.set(zone.id, { at: Date.now(), pending: true, promise });
   return promise;
 }
