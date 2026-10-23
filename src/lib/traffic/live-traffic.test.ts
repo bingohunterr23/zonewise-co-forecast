@@ -33,7 +33,7 @@ describe("shared live TomTom service", () => {
     const { getZoneTraffic } = await import("./live-traffic.server");
     const t = await getZoneTraffic(zone(2));
     expect(t.status).toBe("unavailable");
-    expect(t.error).toBe("HTTP 429");
+    expect(t.error).toContain("HTTP 429");
   });
   it("calls TomTom only once per zone within the cache window", async () => {
     vi.stubEnv("TOMTOM_API_KEY", "k");

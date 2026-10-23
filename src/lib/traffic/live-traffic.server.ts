@@ -19,6 +19,7 @@ export interface TomTomFlow {
 }
 
 export interface LiveTraffic {
+  stale?: boolean;
   zone_id: number;
   status: "ok" | "unavailable";
   provider: "TomTom Traffic Flow";
