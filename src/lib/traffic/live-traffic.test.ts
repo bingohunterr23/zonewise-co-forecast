@@ -19,6 +19,24 @@ describe("shared traffic classification", () => {
 });
 
 describe("shared live TomTom service", () => {
+  it("sends each zone's own coordinates with KMPH units", async () => {
+    vi.stubEnv("TOMTOM_API_KEY", "test-key");
+    const f = vi.fn(async () => Response.json({ flowSegmentData: { currentSpeed: 20, freeFlowSpeed: 24 } }));
+    vi.stubGlobal("fetch", f);
+    const { getZoneTraffic } = await import("./live-traffic.server");
+    await Promise.all([getZoneTraffic({ id: 1, latitude: 12.9177, longitude: 77.623 }), getZoneTraffic({ id: 2, latitude: 12.916, longitude: 77.6101 })]);
+    expect(new URL(String(f.mock.calls[0]?.[0])).searchParams.get('point')).toBe('12.9177,77.623');
+    expect(new URL(String(f.mock.calls[1]?.[0])).searchParams.get('point')).toBe('12.916,77.6101');
+    expect(new URL(String(f.mock.calls[0]?.[0])).searchParams.get('unit')).toBe('KMPH');
+  });
+  it("rejects malformed flow instead of displaying invented speeds", async () => {
+    vi.stubEnv("TOMTOM_API_KEY", "test-key");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ flowSegmentData: { currentSpeed: '20', freeFlowSpeed: 24 } })));
+    const { getZoneTraffic } = await import("./live-traffic.server");
+    const result = await getZoneTraffic(zone(7));
+    expect(result.current_speed).toBeNull();
+    expect(result.error).toContain('malformed');
+  });
   it("is unavailable (no fabricated speeds) without an API key", async () => {
     vi.stubEnv("TOMTOM_API_KEY", "");
     const { getZoneTraffic } = await import("./live-traffic.server");
