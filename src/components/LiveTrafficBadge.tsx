@@ -19,14 +19,14 @@ export function LiveTrafficBadge({ t, loading, detailed = false }: { t?: LiveTra
   const c = t.classification;
   if (t.status !== "ok" || !c) {
     return <span className="inline-flex px-2 py-0.5 rounded-full text-xs bg-warm-100 text-eco-400" title={t.error ?? undefined}>
-      {t.road_closure ? "Road closed (TomTom)" : "Traffic unavailable"}
+      {t.road_closure ? "Road closed (TomTom)" : t.error ?? "Traffic unavailable"}
     </span>;
   }
-  const stale = isStale(t);
+  const stale = loading || isStale(t);
   return (
     <span className={`inline-flex flex-wrap items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${TONE[c.level]}`}
       title="Live TomTom measurement at the road segment nearest the zone point — not the whole zone">
-      {c.label}
+      {c.label}{t.error && <span> · {t.error}</span>}
       {detailed && <span className="font-normal">· {t.current_speed}/{t.free_flow_speed} km/h ({c.ratioPct}%)</span>}
       <span className="font-normal opacity-75">· {stale ? "stale, " : ""}{trafficTime(t)}</span>
     </span>

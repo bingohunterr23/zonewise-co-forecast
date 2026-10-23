@@ -9,12 +9,14 @@ const CLIENT_TTL_MS = 60 * 1000;
 export const TRAFFIC_REFRESH_MS = 5 * 60 * 1000;
 /** A reading older than this is flagged as stale. */
 export const TRAFFIC_STALE_MS = 10 * 60 * 1000;
-let shared: { at: number; promise: Promise<LiveTraffic[]> } | null = null;
+let shared: { at: number; pending: boolean; promise: Promise<LiveTraffic[]> } | null = null;
 
 function load(force: boolean) {
-  if (!force && shared && Date.now() - shared.at < CLIENT_TTL_MS) return shared.promise;
+  if (shared && (shared.pending || (!force && Date.now() - shared.at < CLIENT_TTL_MS))) return shared.promise;
   const promise = getLiveTrafficFn();
-  shared = { at: Date.now(), promise };
+  const entry = { at: Date.now(), pending: true, promise };
+  shared = entry;
+  promise.finally(() => { entry.pending = false; entry.at = Date.now(); }).catch(() => {});
   promise.catch(() => { shared = null; });
   return promise;
 }
@@ -30,9 +32,15 @@ export function useLiveTraffic() {
     setLoading(true);
     try {
       const data = await load(force);
-      if (id === reqId.current) { setTraffic(data); setError(null); }
+      if (id === reqId.current) {
+        setTraffic(previous => data.map(next => {
+          const old = previous?.find(item => item.zone_id === next.zone_id);
+          return next.status !== 'ok' && old?.status === 'ok' ? { ...old, error: next.error, stale: true } : next;
+        }));
+        setError(data.filter(item => item.error).map(item => item.error).join(' · ') || null);
+      }
     } catch (e) {
-      if (id === reqId.current) { setTraffic(null); setError((e as Error).message); }
+      if (id === reqId.current) { setTraffic(previous => previous?.map(item => ({ ...item, stale: true })) ?? null); setError("Traffic could not be refreshed; retained readings are stale."); }
     } finally {
       if (id === reqId.current) setLoading(false);
     }
@@ -49,5 +57,5 @@ export function useLiveTraffic() {
 }
 
 export function isStale(t: LiveTraffic, now = Date.now()) {
-  return now - new Date(t.fetched_at).getTime() > TRAFFIC_STALE_MS;
+  return Boolean(t.stale || now - new Date(t.fetched_at).getTime() > TRAFFIC_STALE_MS);
 }

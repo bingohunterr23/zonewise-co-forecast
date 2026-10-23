@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState } from 'react';
+import { useLiveReadings } from '@/hooks/useLiveReadings';
+import { readingIsStale } from '@/lib/reading-state';
 import {
   Thermometer, Droplets, Gauge, Wind, Cloud, Activity,
   RefreshCw, AlertCircle, MapPin, Clock,
@@ -13,36 +15,8 @@ import { Card, PageHeader, ErrorState, Skeleton, formatValue } from '@/component
 const REFRESH_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
 export function LiveMonitoringPage() {
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [readings, setReadings] = useState<LiveReading[]>([]);
+  const { zones, readings, loading, error, fetchData, lastUpdated } = useLiveReadings();
   const [selectedRegion, setSelectedRegion] = useState<string>('Silk Board Region');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const z = await zoneApi.getZones();
-      setZones(z);
-      const r = await liveApi.getAllReadings(z);
-      setReadings(r);
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-    intervalRef.current = setInterval(fetchData, REFRESH_INTERVAL);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchData]);
-
   const live = useLiveTraffic();
   const filteredZones = zones.filter(z => z.region === selectedRegion);
   const getReading = (zoneId: number) => readings.find(r => r.zone_id === zoneId);
@@ -78,7 +52,7 @@ export function LiveMonitoringPage() {
               {lastUpdated.toLocaleTimeString()}
             </div>
           )}
-          <button onClick={fetchData} className="flex items-center gap-1.5 text-sm text-eco-600 hover:text-eco-800 font-medium transition-colors">
+          <button disabled={loading} onClick={() => { void fetchData(); void live.refresh(true); }} className="flex items-center gap-1.5 text-sm text-eco-600 hover:text-eco-800 font-medium transition-colors">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
@@ -90,11 +64,11 @@ export function LiveMonitoringPage() {
         <p className="text-sm text-eco-600">
           OpenWeather provides data for the nearest available measurement point to each zone's coordinates.
           These are not physical sensor readings at the exact zone location.
-          Auto-refreshes every 10 minutes.
+          Auto-refreshes every 5 minutes.
         </p>
       </div>
 
-      {error && !loading && readings.length === 0 && (
+      {error && !loading && (
         <ErrorState message={error} onRetry={fetchData} />
       )}
 
@@ -134,7 +108,7 @@ function ZoneCard({ zone, reading, loading, traffic, trafficLoading }: { zone: Z
             </span>
           </div>
         </div>
-        {loading ? (
+        {loading && !reading ? (
           <Skeleton className="w-16 h-7" />
         ) : aqiConfig ? (
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${aqiConfig.color}`}>
@@ -151,24 +125,26 @@ function ZoneCard({ zone, reading, loading, traffic, trafficLoading }: { zone: Z
         <span className="font-medium text-eco-800">Live traffic (TomTom, measured): </span>
         {traffic?.status === 'ok' && traffic.classification
           ? <>{traffic.current_speed} km/h vs free-flow {traffic.free_flow_speed} km/h ({traffic.classification.ratioPct}%) · at {trafficTime(traffic)}</>
-          : trafficLoading && !traffic ? 'Loading…' : 'Unavailable'}
+          : trafficLoading && !traffic ? 'Loading…' : traffic?.error ?? 'Unavailable'}
         <span className="block text-eco-400">Nearest road segment to the zone point, not the whole zone. Vehicle volume is an ML prediction — see CO₂ Prediction.</span>
       </div>
 
       {/* Metrics grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Metric icon={Thermometer} label="Temp" value={loading ? null : reading?.temperature} unit="°C" />
-        <Metric icon={Droplets} label="Humidity" value={loading ? null : reading?.humidity} unit="%" />
-        <Metric icon={Gauge} label="Pressure" value={loading ? null : reading?.pressure} unit="hPa" />
-        <Metric icon={Wind} label="Wind" value={loading ? null : reading?.wind_speed} unit="m/s" />
-        <Metric icon={Cloud} label="Clouds" value={loading ? null : reading?.cloud_coverage} unit="%" />
-        <Metric icon={Activity} label="O₃" value={loading ? null : reading?.o3} unit="µg/m³" />
-        <Metric icon={Activity} label="PM2.5" value={loading ? null : reading?.pm2_5} unit="µg/m³" />
-        <Metric icon={Activity} label="PM10" value={loading ? null : reading?.pm10} unit="µg/m³" />
-        <Metric icon={Activity} label="NO₂" value={loading ? null : reading?.no2} unit="µg/m³" />
-        <Metric icon={Activity} label="CO" value={loading ? null : reading?.co} unit="µg/m³" />
+        <Metric icon={Thermometer} label="Temp" value={reading?.temperature} unit="°C" />
+        <Metric icon={Droplets} label="Humidity" value={reading?.humidity} unit="%" />
+        <Metric icon={Gauge} label="Pressure" value={reading?.pressure} unit="hPa" />
+        <Metric icon={Wind} label="Wind" value={reading?.wind_speed} unit="m/s" />
+        <Metric icon={Cloud} label="Clouds" value={reading?.cloud_coverage} unit="%" />
+        <Metric icon={Activity} label="O₃" value={reading?.o3} unit="µg/m³" />
+        <Metric icon={Activity} label="PM2.5" value={reading?.pm2_5} unit="µg/m³" />
+        <Metric icon={Activity} label="PM10" value={reading?.pm10} unit="µg/m³" />
+        <Metric icon={Activity} label="NO₂" value={reading?.no2} unit="µg/m³" />
+        <Metric icon={Activity} label="CO" value={reading?.co} unit="µg/m³" />
       </div>
 
+      {reading?.fetched_at && <p className="mt-3 text-xs text-eco-400">{loading || readingIsStale(reading) ? 'Stale · last successful reading: ' : 'Updated: '}{new Date(reading.fetched_at).toLocaleString()}</p>}
+      {!loading && reading?.error && <p className="mt-3 text-xs text-clay-500">{reading.error}</p>}
       {!loading && !reading && (
         <div className="mt-4 flex items-center gap-2 text-sm text-clay-500 p-3 rounded-lg bg-clay-50">
           <AlertCircle size={16} />

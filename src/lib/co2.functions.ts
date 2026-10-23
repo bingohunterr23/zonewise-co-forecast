@@ -6,9 +6,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { ZONES_SEED } from "@/types";
 
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return (await res.json()) as T;
+  const { requestWeatherJson } = await import('./provider-request.server');
+  return requestWeatherJson<T>(url, url.includes('/air_pollution') ? 'OpenWeather air quality' : 'OpenWeather weather');
 }
 
 export const getCo2ModelInfoFn = createServerFn({ method: "GET" }).handler(async () => {
@@ -38,8 +37,8 @@ export const predictLocationCo2Fn = createServerFn({ method: "GET" })
     const zone = ZONES_SEED.find((z) => z.id === data.zoneId);
     if (!zone) throw new Error("Unknown location");
     const now = new Date();
-    const owKey = process.env["OPENWEATHER_API_KEY"];
-    const ttKey = process.env["TOMTOM_API_KEY"];
+    const owKey = process.env["OPENWEATHER_API_KEY"]?.trim();
+    const ttKey = process.env["TOMTOM_API_KEY"]?.trim();
     const { estimateCo2, weatherClass, istParts, co2Model } = await import("./co2/co2.server");
     const { getZoneTraffic } = await import("./traffic/live-traffic.server");
 
@@ -128,7 +127,7 @@ export const predictLocationCo2Fn = createServerFn({ method: "GET" })
       coordinates: { latitude: zone.latitude, longitude: zone.longitude },
       model_feature_order: co2Model.traffic.feature_names,
       model_input_features: prediction
-        ? Object.fromEntries(co2Model.traffic.feature_names.map((n, i) => [n, prediction!.traffic_vector[i]]))
+        ? Object.fromEntries(co2Model.traffic.feature_names.map((n, i) => [n, prediction?.traffic_vector[i] ?? null]))
         : null,
       live_inputs: { current_speed: traffic?.current_speed ?? null, free_flow_speed: traffic?.free_flow_speed ?? null, weather: weather?.model_class ?? null },
       predicted_vehicles_per_hour: prediction?.expected_vehicles_per_hour ?? null,

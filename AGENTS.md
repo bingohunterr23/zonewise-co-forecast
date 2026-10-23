@@ -15,3 +15,6 @@
 - CO₂ estimates use a fleet-weighted emission-factor method (per-category factors × vehicle shares in src/lib/co2/co2.server.ts FLEET) with cited sources, because only sourced coefficients are allowed; speed corrections need verified COPERT coefficients first.
 - Large datasets are stored gzipped under ml/datasets to stay under the repo file-size limit.
 - Live traffic for every module comes from src/lib/traffic/live-traffic.server.ts (cached per zone) and is labelled by classifyTraffic in src/lib/co2/traffic-condition.ts, so all pages agree and TomTom isn't called twice for the same reading.
+
+- Provider HTTP transport lives in a shared server-only helper with bounded timeouts, deduplication, short-lived raw-response caching, and sanitized failures to prevent quota bursts and secret leakage. Predictions are never cached as substitutes for fresh model inputs.
+- Browser reading state retains only successful per-zone data with original timestamps and explicit stale/error status so refresh failures cannot masquerade as live results.

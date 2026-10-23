@@ -1,7 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useLiveReadings } from '@/hooks/useLiveReadings';
+import { readingIsStale } from '@/lib/reading-state';
+import { Button } from '@/components/ui/button';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { MapPin, Filter, AlertCircle, Cloud, Wind, Layers } from 'lucide-react';
+import { MapPin, Filter, AlertCircle, Cloud, Wind, Layers, RefreshCw } from 'lucide-react';
 import 'leaflet/dist/leaflet.css';
 import { zoneApi, liveApi, modelApi } from '@/services/api';
 import type { Zone, LiveReading } from '@/types';
@@ -61,31 +64,11 @@ function MapBounds({ zones }: { zones: Zone[] }) {
 }
 
 export function AreaVisualizationPage() {
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [readings, setReadings] = useState<LiveReading[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { zones, readings, loading, error, fetchData, lastUpdated } = useLiveReadings();
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const live = useLiveTraffic();
   const [basemap, setBasemap] = useState<'street' | 'satellite'>('street');
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const z = await zoneApi.getZones();
-      setZones(z);
-      const r = await liveApi.getAllReadings(z);
-      setReadings(r);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
 
   const filteredZones = selectedRegion === 'all'
     ? zones
@@ -100,6 +83,10 @@ export function AreaVisualizationPage() {
         subtitle="Interactive map of all 8 Bengaluru monitoring zones with live environmental data"
       />
 
+      <div className="flex items-center gap-3 mb-3 text-xs text-eco-500">
+        {lastUpdated && <span>{loading || readings.some(reading => readingIsStale(reading)) ? 'Stale · ' : ''}Last updated: {lastUpdated.toLocaleString()}</span>}
+        <Button variant="ghost" size="sm" disabled={loading} onClick={() => { void fetchData(); void live.refresh(true); }}><RefreshCw size={14} />Refresh</Button>
+      </div>
       {/* Region filter */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex items-center gap-2 text-eco-600">
@@ -144,7 +131,7 @@ export function AreaVisualizationPage() {
         {/* Map */}
         <div className="lg:col-span-2">
           <Card className="p-0 overflow-hidden">
-            {loading ? (
+            {loading && readings.length === 0 ? (
               <Skeleton className="w-full h-[500px] rounded-2xl" />
             ) : (
               <MapContainer
@@ -191,7 +178,7 @@ export function AreaVisualizationPage() {
                             <strong>Live traffic (TomTom):</strong>{' '}
                             {t?.status === 'ok' && t.classification
                               ? `${t.classification.label} · ${t.current_speed}/${t.free_flow_speed} km/h (${t.classification.ratioPct}%) · ${trafficTime(t)}`
-                              : live.loading && !t ? 'Loading…' : 'Unavailable'}
+                              : live.loading && !t ? 'Loading…' : t?.error ?? 'Unavailable'}
                             <div style={{ fontSize: '10px', color: '#54ae80' }}>Nearest road segment, not the whole zone</div>
                           </div>
                           <div style={{ fontSize: '12px', color: '#333', lineHeight: '1.8' }}>
@@ -200,6 +187,8 @@ export function AreaVisualizationPage() {
                             <div><strong>PM10:</strong> {reading?.pm10?.toFixed(1) ?? 'Unavailable'} µg/m³</div>
                             <div><strong>CO₂:</strong> <em>See CO₂ Prediction</em></div>
                             <div><strong>Source:</strong> {reading?.source ?? 'N/A'}</div>
+                            {reading && <div>{loading || readingIsStale(reading) ? 'Stale · ' : ''}{reading.fetched_at ? new Date(reading.fetched_at).toLocaleString() : 'No successful reading'}</div>}
+                            {reading?.error && <div>{reading.error}</div>}
                           </div>
                         </div>
                       </Popup>
@@ -241,6 +230,7 @@ export function AreaVisualizationPage() {
                         <LiveTrafficBadge t={live.forZone(zone.id)} loading={live.loading} />
                       </span>
                     </div>
+                    {reading?.error && <p className="mt-2 text-xs text-clay-500">{reading.error}</p>}
                     {reading && (
                       <div className="flex items-center gap-3 mt-2 text-xs text-eco-500">
                         <span className="flex items-center gap-1">

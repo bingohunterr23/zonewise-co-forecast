@@ -25,9 +25,11 @@ export function PredictionPage() {
   const [info, setInfo] = useState<ModelInfo | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [zoneId, setZoneId] = useState<number>(ZONES_SEED[0]!.id);
+  const [zoneId, setZoneId] = useState<number>(ZONES_SEED[0]?.id ?? 1);
   const [result, setResult] = useState<LocationPrediction | null>(null);
   const [predLoading, setPredLoading] = useState(false);
+  const [stale, setStale] = useState(false);
+  const pendingZones = useRef(new Map<number, Promise<LocationPrediction>>());
   const [predError, setPredError] = useState('');
 
   const loadInfo = useCallback(async () => {
@@ -44,18 +46,36 @@ export function PredictionPage() {
 
   const reqId = useRef(0);
   const predict = useCallback(async (id: number) => {
+
     const my = ++reqId.current; // ignore stale responses after a zone switch
     setPredLoading(true);
     setPredError('');
+    setStale(true);
     setResult(prev => (prev?.location.id === id ? prev : null));
     try {
-      const r = await predictLocationCo2Fn({ data: { zoneId: id } });
-      if (my === reqId.current) setResult(r);
+      let pending = pendingZones.current.get(id);
+      if (!pending) {
+        pending = predictLocationCo2Fn({ data: { zoneId: id } });
+        pendingZones.current.set(id, pending);
+      }
+      const r = await pending;
+      if (my === reqId.current) {
+        setResult(previous => {
+          if (!previous || previous.location.id !== id || r.errors.length === 0) return r;
+          const retained = (!r.traffic && previous.traffic) || (!r.weather && previous.weather) || (!r.air && previous.air);
+          if (!retained) return r;
+          return { ...r, traffic: r.traffic ?? previous.traffic, weather: r.weather ?? previous.weather,
+            air: r.air ?? previous.air, prediction: r.prediction ?? previous.prediction,
+            timestamp: previous.timestamp, time: previous.time };
+        });
+        setStale(r.errors.length > 0);
+      }
     } catch (e) {
       if (my !== reqId.current) return;
-      setResult(null);
+      setStale(true);
       setPredError((e as Error).message);
     } finally {
+      pendingZones.current.delete(id);
       if (my === reqId.current) setPredLoading(false);
     }
   }, []);
@@ -64,15 +84,8 @@ export function PredictionPage() {
   useEffect(() => {
     void predict(zoneId);
     const t = setInterval(() => { void predict(zoneId); }, LIVE_REFRESH_MS);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); reqId.current++; };
   }, [zoneId, predict]);
-
-  if (loading) return (
-    <div>
-      <PageHeader title="CO₂ Intelligence" subtitle="Estimated CO₂ emissions from live Bengaluru traffic" />
-      <LoadingState message="Loading models..." />
-    </div>
-  );
 
   const p = result?.prediction ?? null;
   const hourNow = result?.time.hour;
@@ -110,7 +123,9 @@ export function PredictionPage() {
         </div>
       </div>
 
-      {error ? <ErrorState message={error} onRetry={loadInfo} /> : (
+      {error && <ErrorState message={error} onRetry={loadInfo} />}
+      {loading && <LoadingState message="Loading models..." />}
+      {(
         <>
           {info && (!info.configured.traffic || !info.configured.openweather) && (
             <div className="mb-6 p-4 rounded-xl bg-clay-50 border border-clay-100 flex items-start gap-3">
@@ -209,7 +224,7 @@ export function PredictionPage() {
                       <Row label="Date" value={result.time.date} />
                       <Row label="Hour (IST)" value={`${String(result.time.hour).padStart(2, '0')}:00`} />
                       <Row label="Peak hour" value={p ? (p.time.is_peak ? 'Yes' : 'No') : UNAVAILABLE} />
-                      <p className="text-xs text-eco-400 mt-1">{new Date(result.timestamp).toLocaleString()}</p>
+                      <p className="text-xs text-eco-400 mt-1">{stale || predLoading ? "Stale · last successful result: " : ""}{new Date(result.timestamp).toLocaleString()}</p>
                     </>
                   ) : <Unavailable />}
                 </FlowCard>
