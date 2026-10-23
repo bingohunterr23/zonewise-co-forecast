@@ -25,9 +25,11 @@ export function PredictionPage() {
   const [info, setInfo] = useState<ModelInfo | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [zoneId, setZoneId] = useState<number>(ZONES_SEED[0]!.id);
+  const [zoneId, setZoneId] = useState<number>(ZONES_SEED[0]?.id ?? 1);
   const [result, setResult] = useState<LocationPrediction | null>(null);
   const [predLoading, setPredLoading] = useState(false);
+  const [stale, setStale] = useState(false);
+  const busyZones = useRef(new Set<number>());
   const [predError, setPredError] = useState('');
 
   const loadInfo = useCallback(async () => {
@@ -44,18 +46,22 @@ export function PredictionPage() {
 
   const reqId = useRef(0);
   const predict = useCallback(async (id: number) => {
+    if (busyZones.current.has(id)) return;
+    busyZones.current.add(id);
     const my = ++reqId.current; // ignore stale responses after a zone switch
     setPredLoading(true);
     setPredError('');
+    setStale(true);
     setResult(prev => (prev?.location.id === id ? prev : null));
     try {
       const r = await predictLocationCo2Fn({ data: { zoneId: id } });
-      if (my === reqId.current) setResult(r);
+      if (my === reqId.current) { setResult(r); setStale(false); }
     } catch (e) {
       if (my !== reqId.current) return;
-      setResult(null);
+      setStale(true);
       setPredError((e as Error).message);
     } finally {
+      busyZones.current.delete(id);
       if (my === reqId.current) setPredLoading(false);
     }
   }, []);
@@ -64,7 +70,7 @@ export function PredictionPage() {
   useEffect(() => {
     void predict(zoneId);
     const t = setInterval(() => { void predict(zoneId); }, LIVE_REFRESH_MS);
-    return () => clearInterval(t);
+    return () => { clearInterval(t); reqId.current++; };
   }, [zoneId, predict]);
 
   if (loading) return (
@@ -209,7 +215,7 @@ export function PredictionPage() {
                       <Row label="Date" value={result.time.date} />
                       <Row label="Hour (IST)" value={`${String(result.time.hour).padStart(2, '0')}:00`} />
                       <Row label="Peak hour" value={p ? (p.time.is_peak ? 'Yes' : 'No') : UNAVAILABLE} />
-                      <p className="text-xs text-eco-400 mt-1">{new Date(result.timestamp).toLocaleString()}</p>
+                      <p className="text-xs text-eco-400 mt-1">{stale || predLoading ? "Stale · last successful result: " : ""}{new Date(result.timestamp).toLocaleString()}</p>
                     </>
                   ) : <Unavailable />}
                 </FlowCard>

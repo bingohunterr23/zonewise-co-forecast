@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useLiveReadings } from '@/hooks/useLiveReadings';
+import { averageAqi, readingIsStale } from '@/lib/reading-state';
 import { Link } from '@tanstack/react-router';
 import {
   Wind, Droplets, Thermometer, Cloud, Gauge, Activity, TrendingUp,
@@ -12,38 +13,14 @@ import { LiveTrafficBadge } from '@/components/LiveTrafficBadge';
 import { Card, PageHeader, ErrorState, Skeleton, formatValue } from '@/components/ui';
 
 export function HomePage() {
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [readings, setReadings] = useState<LiveReading[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const z = await zoneApi.getZones();
-      setZones(z);
-      const r = await liveApi.getAllReadings(z);
-      setReadings(r);
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
+  const { zones, readings, loading, error, fetchData, lastUpdated } = useLiveReadings();
+  const stale = loading || readings.some(reading => readingIsStale(reading));
   const live = useLiveTraffic();
   const firstReading = readings[0];
 
   const navCards = [
     { to: '/dashboard/live', label: 'Live Monitoring', desc: 'Real-time air quality & weather', icon: Activity },
-    { to: '/dashboard/predict', label: 'CO₂ Prediction', desc: 'CHETNA ML-based current estimates', icon: TrendingUp },
+    { to: '/dashboard/predict', label: 'CO₂ Prediction', desc: 'Machine-learning-based CO₂ estimates', icon: TrendingUp },
     { to: '/dashboard/map', label: 'Area Visualization', desc: 'Interactive zone map', icon: Map },
     { to: '/dashboard/green-cover', label: 'Green Cover', desc: 'Satellite vegetation analysis', icon: Leaf },
     { to: '/dashboard/tree-impact', label: 'Tree Impact', desc: 'CO₂ absorption calculator', icon: TreePine },
@@ -61,7 +38,7 @@ export function HomePage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2 text-sm text-eco-600">
           <div className={`w-2 h-2 rounded-full ${loading ? 'bg-warm-400 animate-pulse' : error ? 'bg-clay-400' : 'bg-eco-500 animate-pulse-soft'}`} />
-          <span>{loading ? 'Fetching live data...' : error ? 'Connection issue' : 'Live data active'}</span>
+          <span>{loading ? 'Fetching live data… · previous readings are stale' : error ? 'Connection issue · retained readings are stale' : stale ? 'Stale readings' : 'Live data active'}</span>
         </div>
         <div className="flex items-center gap-3">
           {lastUpdated && (
@@ -69,7 +46,7 @@ export function HomePage() {
               Last updated: {lastUpdated.toLocaleTimeString()}
             </span>
           )}
-          <button onClick={fetchData} className="flex items-center gap-1.5 text-sm text-eco-600 hover:text-eco-800 font-medium transition-colors">
+          <button disabled={loading} onClick={() => { void fetchData(); void live.refresh(true); }} className="flex items-center gap-1.5 text-sm text-eco-600 hover:text-eco-800 font-medium transition-colors">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Refresh
           </button>
@@ -87,35 +64,35 @@ export function HomePage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <MetricCard
           label="Overall AQI"
-          value={loading ? null : firstReading?.aqi}
+          value={firstReading?.aqi}
           suffix={firstReading?.aqi_category || ''}
           icon={Activity}
           color="eco"
-          loading={loading}
+          loading={loading && readings.length === 0}
         />
         <MetricCard
           label="PM2.5"
-          value={loading ? null : firstReading?.pm2_5}
+          value={firstReading?.pm2_5}
           suffix="µg/m³"
           icon={Wind}
           color="clay"
-          loading={loading}
+          loading={loading && readings.length === 0}
         />
         <MetricCard
           label="PM10"
-          value={loading ? null : firstReading?.pm10}
+          value={firstReading?.pm10}
           suffix="µg/m³"
           icon={Wind}
           color="warm"
-          loading={loading}
+          loading={loading && readings.length === 0}
         />
         <MetricCard
           label="CO"
-          value={loading ? null : firstReading?.co}
+          value={firstReading?.co}
           suffix="µg/m³"
           icon={Gauge}
           color="eco"
-          loading={loading}
+          loading={loading && readings.length === 0}
         />
       </div>
 
@@ -124,27 +101,27 @@ export function HomePage() {
         <MetricCard label="CO₂ Prediction" value={null} suffix="" icon={TrendingUp} color="eco" loading={false} hint="See CO₂ Prediction" />
         <MetricCard
           label="Temperature"
-          value={loading ? null : firstReading?.temperature}
+          value={firstReading?.temperature}
           suffix="°C"
           icon={Thermometer}
           color="warm"
-          loading={loading}
+          loading={loading && readings.length === 0}
         />
         <MetricCard
           label="Humidity"
-          value={loading ? null : firstReading?.humidity}
+          value={firstReading?.humidity}
           suffix="%"
           icon={Droplets}
           color="eco"
-          loading={loading}
+          loading={loading && readings.length === 0}
         />
         <MetricCard
           label="NO₂"
-          value={loading ? null : firstReading?.no2}
+          value={firstReading?.no2}
           suffix="µg/m³"
           icon={Cloud}
           color="clay"
-          loading={loading}
+          loading={loading && readings.length === 0}
         />
       </div>
 
@@ -164,9 +141,7 @@ export function HomePage() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-eco-700">
-                      {regionReadings.length > 0
-                        ? regionReadings.filter(r => r.aqi).reduce((a, r) => a + (r.aqi || 0), 0) / regionReadings.filter(r => r.aqi).length || 0 | 0
-                        : '—'}
+                      {averageAqi(regionReadings) ?? '—'}
                     </p>
                     <p className="text-xs text-eco-400">avg AQI</p>
                   </div>
